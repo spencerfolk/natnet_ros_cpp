@@ -9,6 +9,7 @@
 #include <ros/publisher.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PointStamped.h>
+#include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/Point32.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_ros/transform_broadcaster.h>
@@ -31,6 +32,7 @@ public:
     std::map<std::string, ros::Publisher> RigidbodyPub;
     std::map<std::string, ros::Publisher> RigidbodyMarkerPub;
     std::map<std::string, ros::Publisher> IndividualMarkerPub;
+    std::map<std::string, ros::Publisher> RigidbodyMarkerArrayPub;
     std::map<std::string, ros::Publisher> SkeletonPub; // WIP : Need Help
     std::map<std::string, ros::Publisher> ForcePlatePub; // WIP : Need Help
     std::map<std::string, ros::Publisher> DevicePub; // WIP : Need Help

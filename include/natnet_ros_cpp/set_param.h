@@ -28,6 +28,7 @@ public:
     bool pub_rigid_body_marker = false; // To enable publishing individual markers of rigidbodies
     bool pub_individual_marker = false; // To publish the position of individual markers
     bool pub_pointcloud = false; // To publish all the marker as pointcloud
+    bool pub_rigid_body_marker_array = false; // To publish the markers as a PoseArray
     std::string serverIP;
     std::string clientIP;
     std::string serverType;
@@ -57,6 +58,7 @@ public:
         n.getParam("pub_rigid_body_marker", pub_rigid_body_marker);
         n.getParam("pub_individual_marker", pub_individual_marker);
         n.getParam("pub_pointcloud", pub_pointcloud);
+        n.getParam("pub_rigid_body_marker_array", pub_rigid_body_marker_array);
 
         if (n.getParam("/conn_params/serverIP", serverIP))
         {

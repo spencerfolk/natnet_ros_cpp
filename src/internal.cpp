@@ -139,6 +139,13 @@ void Internal::Info(NatNetClient* g_pClient, ros::NodeHandle &n)
                         }
                     }
                 }
+
+                // Create publisher for array of marker poses
+                if (rosparam.pub_rigid_body_marker_array)
+                {
+                    this->RigidbodyMarkerArrayPub[pRB->szName] =
+                        n.advertise<geometry_msgs::PoseArray>(body_name + "/individual_marker_array", 10);
+                }
             }
             else if (pDataDefs->arrDataDescriptions[i].type == Descriptor_Camera)
             {
@@ -198,8 +205,11 @@ void Internal::LatenciInfo(sFrameOfMocapData* data, void* pUserData, Internal &i
 
 void Internal::DataHandler(sFrameOfMocapData* data, void* pUserData, Internal &internal)
 {   
-    int i=0;
+    int i = 0;
     ROS_INFO_COND(internal.rosparam.log_frames, "FrameID : %d", data->iFrame);
+
+    // Temporary storage for rigid body marker arrays
+    std::map<std::string, geometry_msgs::PoseArray> markerArrays;
 
     // Rigid Bodies
     ROS_INFO_COND(internal.rosparam.log_frames, "Rigid Bodies [Count=%d]", data->nRigidBodies);
@@ -219,6 +229,8 @@ void Internal::DataHandler(sFrameOfMocapData* data, void* pUserData, Internal &i
     // Markers
     for(i=0; i < data->nLabeledMarkers; i++) 
     {  
+        const sMarker& marker = data->LabeledMarkers[i];
+
         ROS_INFO_COND(internal.rosparam.log_frames, "Markers [Count=%i]", i);
         ROS_INFO_COND(internal.rosparam.log_frames, "x\ty\tz");
         ROS_INFO_COND(internal.rosparam.log_frames, "%3.2f\t%3.2f\t%3.2f", data->LabeledMarkers[i].x, data->LabeledMarkers[i].y, data->LabeledMarkers[i].z);
@@ -233,26 +245,64 @@ void Internal::DataHandler(sFrameOfMocapData* data, void* pUserData, Internal &i
         }
         if(internal.rosparam.pub_rigid_body_marker && !bUnlabeled)
         {
-            PubRigidbodyMarker(data->LabeledMarkers[i], internal);
+            int modelID, markerID;
+            NatNet_DecodeID(marker.ID, &modelID, &markerID);
+
+            auto it = internal.ListRigidBodies.find(modelID);
+            if (it != internal.ListRigidBodies.end())
+            {
+                std::string bodyName = it->second;
+
+                geometry_msgs::Pose pose;
+                pose.position.x = marker.x;
+                pose.position.y = marker.y;
+                pose.position.z = marker.z;
+                pose.orientation.x = 0.0;
+                pose.orientation.y = 0.0;
+                pose.orientation.z = 0.0;
+                pose.orientation.w = 1.0;
+
+                markerArrays[bodyName].poses.push_back(pose);
+            }
         }
     }
+
+    // Publish PoseArray per rigid body if enabled
+    if (internal.rosparam.pub_rigid_body_marker_array)
+    {
+        for (auto& pair : markerArrays)
+        {
+            std::string bodyName = pair.first;
+            geometry_msgs::PoseArray& arrayMsg = pair.second;
+            arrayMsg.header.frame_id = internal.rosparam.globalFrame;
+            arrayMsg.header.stamp = ros::Time::now();
+            internal.RigidbodyMarkerArrayPub[bodyName].publish(arrayMsg);
+        }
+    }
+
+    // Optional error amplification logic for marker tracking
     if (internal.rosparam.pub_individual_marker)
     {
         internal.rosparam.object_list_prev = internal.rosparam.object_list;
-        if(internal.UnlabeledCount < (int)internal.rosparam.object_list.size() && internal.rosparam.error_amp==1.0)
-            internal.rosparam.error_amp = internal.rosparam.error_amp*2;
+        if(internal.UnlabeledCount < (int)internal.rosparam.object_list.size() && internal.rosparam.error_amp == 1.0)
+            internal.rosparam.error_amp = internal.rosparam.error_amp * 2;
         else   
             internal.rosparam.error_amp = 1.0;
     }
-    if(internal.rosparam.pub_pointcloud)
+
+    // Publish accumulated point cloud
+    if (internal.rosparam.pub_pointcloud)
     {
-        internal.msgPointcloud.header.frame_id= internal.rosparam.globalFrame;
-        internal.msgPointcloud.header.stamp=ros::Time::now();
+        internal.msgPointcloud.header.frame_id = internal.rosparam.globalFrame;
+        internal.msgPointcloud.header.stamp = ros::Time::now();
         internal.PointcloudPub.publish(internal.msgPointcloud);
     }
-    internal.msgPointcloud.points.clear() ;
-    internal.UnlabeledCount = 0; 
+
+    // Cleanup after frame
+    internal.msgPointcloud.points.clear();
+    internal.UnlabeledCount = 0;
 }
+
 
 void Internal::PubRigidbodyPose(sRigidBodyData &data, Internal &internal)
 {
