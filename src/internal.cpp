@@ -256,6 +256,10 @@ void Internal::DataHandler(sFrameOfMocapData* data, void* pUserData, Internal &i
 
 void Internal::PubRigidbodyPose(sRigidBodyData &data, Internal &internal)
 {
+
+    if ((data.params & 0x01) == 0) // Check to see if NatNet SDK is still tracking this object. 
+        return;
+
     // Creating a msg to put data related to the rigid body and 
     geometry_msgs::PoseStamped msgRigidBodyPose;
     msgRigidBodyPose.header.frame_id = internal.rosparam.globalFrame;
